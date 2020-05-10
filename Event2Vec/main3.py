@@ -29,10 +29,6 @@ def main():
     for event in list(ersvp):
         if not event.isnumeric():
             del ersvp[event]
-    # # experimental.. should ideally be commented
-    # for event in list(ersvp):
-    #     if int(event) % 2 == 0:
-    #         del ersvp[event]
 
     # deleting events with strength less than 20
     for event in list(ersvp):
@@ -58,7 +54,7 @@ def main():
 
     # sort user profiles chronological order
     for user in D:
-        D[user] = sorted(D[user], key=lambda events: events[3])
+        D[user] = sorted(D[user], key=lambda eventsKey: eventsKey[3])
         for event in D[user]:
             event[3] = datetime.utcfromtimestamp(event[3] / 1000).strftime("%d/%m/%Y, %H:%M:%S")
 
@@ -71,31 +67,56 @@ def main():
         for event in D[user]:
             D_only_events[user].append(int(event[0]))
 
-    # eltForInputs = {}
-    # eltForOutputs = {}
-    # i = 0
-    # for user in D:
-    #     eltForInputs[user] = D[user][:-1]
-    #     eltForOutputs[user] = D[user][-1]
-    #
-
     allEvents = [event for event in ersvp]
+    #     implementation of event2vec2 not using event descriptions .. only using latitude, longitude, time
+    allLats = [elat[event] for event in ersvp]
+    allLongs = [elon[event] for event in ersvp]
+    allTimes = [datetime.utcfromtimestamp(etime[event] / 1000).strftime("%d/%m/%Y, %H:%M:%S") for event in ersvp]
 
-    mapping = {}
-    for x in range(len(allEvents)):
-        mapping[allEvents[x]] = x
-    # for user in eltForInputs:
-    userOneHots = {}
-    for user in D_only_events:
-        userOneHots[user] = [0]*len(ersvp)
-        for x in range(len(D_only_events[user])):
-            userOneHots[user][mapping[D_only_events[user][x]]] = 1
+    latMappings = {}
+    lonMappings = {}
+    timeMappings = {}
+    #             create mappings for onehot vectors
+    #     latitudes
+    for x in range(len(allLats)):
+        latMappings[allLats[x]] = x
+    #     longitudes
+    for x in range(len(allLongs)):
+        lonMappings[allLongs[x]] = x
+    #     times
+    for x in range(len(allTimes)):
+        timeMappings[allTimes[x].split(" ")[1]] = x
 
+    oneHotLongitude = {}
+    oneHotTime = {}
+    oneHotLatitude = {}
+    for user in D:
+        oneHotLatitude[user] = [0] * len(allLats)
+        oneHotLongitude[user] = [0] * len(allLongs)
+        oneHotTime[user] = [0] * len(allTimes)
+        for events in D[user]:
+            oneHotLongitude[user][lonMappings[events[1]]] = 1
+            oneHotLatitude[user][latMappings[events[2]]] = 1
+            oneHotTime[user][timeMappings[events[3].split(" ")[1]]] = 1
 
+#     for each user oneHotLatitude contains ones at each event mapped index
+#     considering only time and not date, parsing and removing it for further indexing purposes
+#     basic feedforward neural network
+    model = tf.keras.models.Sequential()
+    # input layer
+    model.add(tf.keras.layers.Flatten())
+    # two hidden layers with relu activation
+    model.add(tf.keras.layers.Dense(128,  activation=tf.nn.relu))
+    model.add(tf.keras.layers.Dense(128,  activation=tf.nn.relu))
+    # output classes : probability of attending the event and probability of not attending a event
+    # how to give inputs and outputs?
+    
+    model.add(tf.keras.layers.Dense(2,  activation=tf.nn.softmax))
 
-
-
-
+    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    model.fit()
+#     what are xtrain and xtest and ytrain and ytest
+#     we need the
 
 
 if __name__ == '__main__':
